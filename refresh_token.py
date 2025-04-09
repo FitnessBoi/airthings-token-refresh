@@ -1,53 +1,33 @@
-name: Refresh Airthings Token
+import requests
+import json
+import os
 
-on:
-  schedule:
-    - cron: "*/50 * * * *"  # Runs every 50 minutes
-  workflow_dispatch:  # Allows manual triggering
+# Airthings API credentials (stored as GitHub Secrets)
+client_id = os.getenv("AIRTHINGS_CLIENT_ID")
+client_secret = os.getenv("AIRTHINGS_CLIENT_SECRET")
 
-permissions:
-  contents: write  # Grant write permissions to the GITHUB_TOKEN
+def fetch_airthings_token():
+    if not client_id or not client_secret:
+        raise Exception("Missing AIRTHINGS_CLIENT_ID or AIRTHINGS_CLIENT_SECRET environment variables")
+    url = "https://accounts-api.airthings.com/v1/token"
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    body = f"grant_type=client_credentials&client_id={client_id}&client_secret={client_secret}"
+    response = requests.post(url, headers=headers, data=body)
+    if response.status_code == 200:
+        token_data = response.json()
+        return token_data["access_token"]
+    else:
+        raise Exception(f"Failed to fetch token: {response.status_code} {response.text}")
 
-jobs:
-  refresh-token:
-    runs-on: ubuntu-latest
-    steps:
-      # Checkout the repository
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      # Set up Python
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.9"
-
-      # Install dependencies
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      # Run the script to refresh the token
-      - name: Refresh token
-        env:
-          AIRTHINGS_CLIENT_ID: ${{ secrets.AIRTHINGS_CLIENT_ID }}
-          AIRTHINGS_CLIENT_SECRET: ${{ secrets.AIRTHINGS_CLIENT_SECRET }}
-        run: python refresh_token.py
-
-      # Commit and push the updated token file
-      - name: Commit and push token file
-        run: |
-          git config --global user.name "GitHub Actions Bot"
-          git config --global user.email "bot@noreply.github.com"
-          git add airthings_token.json
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Update Airthings token"
-            git push
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+if __name__ == "__main__":
+    try:
+        token = fetch_airthings_token()
+        # Save the token to a file in the repository
+        with open("airthings_token.json", "w") as f:
+            json.dump({"access_token": token}, f)
+        print(f"Token refreshed: {token}")
+    except Exception as e:
+        print(f"Error: {e}")
+        # Create a dummy file to indicate failure (for debugging)
+        with open("airthings_token.json", "w") as f:
+            json.dump({"error": str(e)}, f)
