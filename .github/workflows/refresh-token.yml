@@ -2,7 +2,7 @@ name: Refresh Airthings Token
 
 on:
   schedule:
-    - cron: "*/50 * * * *"  # Runs every 50 minutes
+    - cron: "50 7 * * *"  # Runs at 7:50 AM UTC daily
   workflow_dispatch:  # Allows manual triggering
 
 permissions:
@@ -43,11 +43,7 @@ jobs:
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "bot@noreply.github.com"
           git add airthings_token.json
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Update Airthings token"
-            git push
-          fi
+          git commit -m "Update Airthings token" --allow-empty
+          git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
